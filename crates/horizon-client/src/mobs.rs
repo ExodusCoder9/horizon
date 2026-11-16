@@ -3693,6 +3693,11 @@ impl Mob {
         }
         let len = (xd * xd + zd * zd).sqrt();
         let (kx, kz) = (xd / len * power, zd / len * power);
+        // `Shulker.setDeltaMovement` does nothing: the shove above drew what it draws and
+        // marked the mob for sync, then changes no motion.
+        if self.species() == Species::Shulker {
+            return;
+        }
         self.velocity = Vec3::new(
             self.velocity.x / 2.0 - kx,
             if self.on_ground {
