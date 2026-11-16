@@ -279,13 +279,41 @@ impl Game<'_> {
         self.swing_arm();
         true
     }
+    /// Total passengers (mobs, guests, and host) aboard `vehicle`, excluding the currently acting player.
+    pub(super) fn mount_passenger_count(&self, vehicle: u32) -> usize {
+        let mob_passengers = self
+            .mobs
+            .iter()
+            .filter(|p| p.extra.mount == Some(vehicle) && !p.removed && p.alive())
+            .count();
+        let guest_passengers = self.lan.as_ref().map_or(0, |h| {
+            h.hub
+                .guests
+                .iter()
+                .filter(|g| Some(g.conn) != self.lan_acting && g.vehicle == Some(vehicle))
+                .count()
+        });
+        let host_passenger = if self.lan_acting.is_some() {
+            usize::from(self.lan_outer_ridings.iter().any(|&r| r == Some(vehicle)))
+        } else {
+            0
+        };
+        mob_passengers + guest_passengers + host_passenger
+    }
     /// `AbstractHorse.mobInteract`. Returns whether the click was used.
     pub(super) fn interact_mount(&mut self, index: usize, item: &str) -> bool {
         let held = self.held().cloned();
         let m = &self.mobs[index];
         let species = m.species();
-        // A server player rides it already (`isVehicle`: no seat, no feeding).
-        if self.ridden_by_guest(m.id) {
+        let is_camel = matches!(species, Species::Camel | Species::CamelHusk);
+        let max_passengers = if is_camel {
+            2
+        } else if species == Species::HappyGhast {
+            4
+        } else {
+            1
+        };
+        if self.mount_passenger_count(m.id) >= max_passengers {
             return false;
         }
         if matches!(species, Species::Pig | Species::Strider) {

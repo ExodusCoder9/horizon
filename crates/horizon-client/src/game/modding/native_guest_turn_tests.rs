@@ -1667,3 +1667,75 @@ fn run_command_runs_from_the_players_own_place_inside_an_outer_command() {
         }
     });
 }
+
+/// Issue #17416: Multiple players cannot ride the same single-seat mount (horse).
+/// A guest interacting with a mount that the host is riding is refused,
+/// while a camel with 1 rider still allows a second player to board.
+#[test]
+#[ignore = "daily"]
+fn multiple_players_cannot_ride_same_mount() {
+    with_guests(|game| {
+        let horse = game.res.mob_types().get("minecraft:horse").unwrap().clone();
+        let mut m = Mob::new(42, horse, Vec3::new(3.0, 64.0, 5.0), 0.0);
+        m.extra.tame = true;
+        game.mobs.push(m);
+        let horse_index = game.mobs.iter().position(|m| m.id == 42).unwrap();
+
+        // Host is riding the horse.
+        game.riding = Some(42);
+
+        // Guest 13 attempts to interact with the horse while host is riding.
+        game.as_guest(13, |game| {
+            assert!(!game.interact_mount(horse_index, "minecraft:air"), "guest cannot board horse host is riding");
+        })
+        .unwrap();
+
+        // Guest boarded check also enforces capacity and reverts if over capacity.
+        game.lan
+            .as_mut()
+            .unwrap()
+            .hub
+            .update_guest(13, |guest| guest.vehicle = Some(42))
+            .unwrap();
+        game.guest_boarded(13, None);
+        assert_eq!(
+            game.lan.as_ref().unwrap().hub.guest(13).unwrap().vehicle,
+            None,
+            "guest vehicle reverted because horse is full"
+        );
+
+        // A camel seats two: host + guest can both ride.
+        let camel = game.res.mob_types().get("minecraft:camel").unwrap().clone();
+        let mut c = Mob::new(43, camel, Vec3::new(5.0, 64.0, 5.0), 0.0);
+        c.extra.tame = true;
+        game.mobs.push(c);
+        let camel_index = game.mobs.iter().position(|m| m.id == 43).unwrap();
+
+        // Host rides the camel.
+        game.riding = Some(43);
+
+        // Guest 13 can board the camel as second rider.
+        game.as_guest(13, |game| {
+            assert!(game.interact_mount(camel_index, "minecraft:air"), "guest can board camel as second rider");
+        })
+        .unwrap();
+        game.lan
+            .as_mut()
+            .unwrap()
+            .hub
+            .update_guest(13, |guest| guest.vehicle = Some(43))
+            .unwrap();
+        game.guest_boarded(13, None);
+        assert_eq!(
+            game.lan.as_ref().unwrap().hub.guest(13).unwrap().vehicle,
+            Some(43),
+            "camel accommodates second rider"
+        );
+
+        // Third rider (guest 12) is refused because camel is full (2 riders).
+        game.as_guest(12, |game| {
+            assert!(!game.interact_mount(camel_index, "minecraft:air"), "third rider cannot board camel");
+        })
+        .unwrap();
+    });
+}

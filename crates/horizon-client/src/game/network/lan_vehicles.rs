@@ -195,12 +195,15 @@ impl Game<'_> {
     /// Whether a server player other than the one acting rides `vehicle`
     /// (`Entity.canAddPassenger`: a boat or minecart seats one player here).
     pub(super) fn ridden_by_guest(&self, vehicle: u32) -> bool {
-        self.lan.as_ref().is_some_and(|h| {
+        let other_guest = self.lan.as_ref().is_some_and(|h| {
             h.hub
                 .guests
                 .iter()
                 .any(|g| Some(g.conn) != self.lan_acting && g.vehicle == Some(vehicle))
-        })
+        });
+        let host_rides = self.lan_acting.is_some()
+            && self.lan_outer_ridings.iter().any(|&r| r == Some(vehicle));
+        other_guest || host_rides
     }
     /// Whether a server player rides `vehicle` (`Entity.isPassenger`: a
     /// passenger does not use a portal on its own, the vehicle carries it
@@ -335,12 +338,37 @@ impl Game<'_> {
         if before == Some(vehicle) {
             return;
         }
-        // The host in the window rides it already.
-        if self.riding == Some(vehicle) {
-            {
-                let value = before;
-                host.hub.guests.update(gi, |guest| guest.vehicle = value);
+        let capacity = if self.boats.iter().any(|b| b.id == vehicle) {
+            2
+        } else if let Some(m) = self.mobs.iter().find(|m| m.id == vehicle) {
+            if matches!(
+                m.species(),
+                horizon_client::mobs::Species::Camel | horizon_client::mobs::Species::CamelHusk
+            ) {
+                2
+            } else if m.species() == horizon_client::mobs::Species::HappyGhast {
+                4
+            } else {
+                1
             }
+        } else {
+            1
+        };
+        let host_riders = usize::from(self.riding == Some(vehicle));
+        let guest_riders = host
+            .hub
+            .guests
+            .iter()
+            .filter(|g| g.vehicle == Some(vehicle))
+            .count();
+        let mob_riders = self
+            .mobs
+            .iter()
+            .filter(|m| m.extra.mount == Some(vehicle) && !m.removed && m.alive())
+            .count();
+        if host_riders + guest_riders + mob_riders > capacity {
+            let value = before;
+            host.hub.guests.update(gi, |guest| guest.vehicle = value);
             return;
         }
         let at = self

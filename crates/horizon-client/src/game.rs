@@ -1932,6 +1932,8 @@ struct Game<'a> {
     save_after_guest_turn: bool,
     /// Guests whose records are displaced by nested player swaps, outer first.
     lan_guest_swaps: Vec<u32>,
+    /// Outer vehicle(s) displaced by nested guest turns, outer first.
+    lan_outer_ridings: Vec<Option<u32>>,
     /// Live attachments and original snapshots retained during player replacement.
     player_state: original_player::PlayerState,
     /// The block the acting player is breaking (`break_block`): its destroy
@@ -11145,6 +11147,7 @@ impl<'a> Game<'a> {
             lan_building_boxes: Default::default(),
             save_after_guest_turn: false,
             lan_guest_swaps: Vec::new(),
+            lan_outer_ridings: Vec::new(),
             player_state: Default::default(),
             lan_break_pos: None,
             break_collect: None,
