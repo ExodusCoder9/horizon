@@ -587,6 +587,14 @@ client starts (`--help`) and that the binaries import only system libraries (Win
     cargo test --lib    # tag separation, version order, update selection, notes as text,
                         # the auto-install default, the links fallback
 
+Run the complete launcher checks through `python3 tools/pr_ready.py` from the repository root.
+It and the launcher workflow give every Cargo test target fresh launcher/game homes, a private
+location pointer, XDG data/config folders, trash, clipboard and desktop paths, and remove the
+scratch home on exit. On Windows the scratch path must also be ASCII and contain no spaces,
+or build tools can fall back outside it. Direct Cargo runs of binary or integration tests need
+the same overrides: they link the library without `cfg(test)`, so its library-test fallback
+alone does not keep them out of the player's profile.
+
 Geist and Geist Mono (SIL Open Font License, `crates/horizon-theme/fonts/OFL-*.txt`, shared with the game's on-screen keyboard) are
 bundled so the type is the same on every platform.
 
