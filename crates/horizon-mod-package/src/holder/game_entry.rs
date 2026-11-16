@@ -108,6 +108,26 @@ fn acquire_standalone(
     }))
 }
 
+/// Resolve aliases before a missing selected suffix, so deletion cannot make a
+/// managed home appear to be outside its canonical launcher data directory.
+fn canonical_candidate(path: &Path) -> io::Result<PathBuf> {
+    let mut ancestor = path;
+    loop {
+        match ancestor.canonicalize() {
+            Ok(mut resolved) => {
+                if ancestor != path {
+                    resolved.push(path.strip_prefix(ancestor).expect("selected path ancestor"));
+                }
+                return Ok(resolved);
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                ancestor = ancestor.parent().ok_or(error)?;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 /// Only the launcher's macOS game bundle relocates the image below its installation.
 /// Snapshot capture requires the returned installation's `.installed` marker.
 #[cfg(target_os = "macos")]
@@ -167,11 +187,7 @@ pub fn lease_paths(
         }
     }
     for path in candidates {
-        let path = match path.canonicalize() {
-            Ok(path) => path,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => path,
-            Err(error) => return Err(error),
-        };
+        let path = canonical_candidate(&path)?;
         if path.starts_with(data) && !paths.iter().any(|(existing, _)| *existing == path) {
             paths.push((path, false));
         }

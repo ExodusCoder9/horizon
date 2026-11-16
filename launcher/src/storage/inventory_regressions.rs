@@ -76,6 +76,7 @@ fn entry_uses_held_directory_after_root_path_is_redirected() {
     let moved = home.0.with_extension("original");
     fs::rename(&home.0, &moved).unwrap();
     std::os::unix::fs::symlink(&outside.0, &home.0).unwrap();
+    assert!(matches!(Root::configured(&home.0), Err(Error::Unsafe(_))));
     storage
         .apply(vec![entry], Some(Category::RustCompiler), false)
         .unwrap();
@@ -268,7 +269,11 @@ fn capable_units_delete_only_after_the_last_game_lease_and_mixed_builds_stay_res
     let mut game = command().spawn().unwrap();
     let end = std::time::Instant::now() + std::time::Duration::from_secs(15);
     while !root.join("ready").exists() {
-        assert!(std::time::Instant::now() < end);
+        assert!(
+            std::time::Instant::now() < end,
+            "game never acknowledged its leases; child status: {:?}",
+            game.try_wait().unwrap()
+        );
         std::thread::yield_now();
     }
     assert!(matches!(
@@ -281,6 +286,7 @@ fn capable_units_delete_only_after_the_last_game_lease_and_mixed_builds_stay_res
     assert!(!cache.exists());
     assert_eq!(command().status().unwrap().code(), Some(78));
     fs::remove_file(install.join(".installed")).unwrap();
+    let install = install.canonicalize().unwrap();
     let storage = Storage::at(&root.join("data")).unwrap();
     assert!(
         storage
