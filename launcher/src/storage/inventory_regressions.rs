@@ -247,7 +247,10 @@ fn capable_units_delete_only_after_the_last_game_lease_and_mixed_builds_stay_res
     let redirected = root.join("data/redirected");
     std::os::unix::fs::symlink(&outside, &redirected).unwrap();
     assert!(crate::cache_cleanup::delete_game_unit(&redirected.join("cache")).is_err());
-    assert_eq!(fs::read(outside.join("cache/world")).unwrap(), b"player data");
+    assert_eq!(
+        fs::read(outside.join("cache/world")).unwrap(),
+        b"player data"
+    );
     let linked = root.join("data/linked");
     std::os::unix::fs::symlink(&cache, &linked).unwrap();
     assert!(matches!(
