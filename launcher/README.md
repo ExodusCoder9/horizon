@@ -453,6 +453,11 @@ scripts and tests). Test runs also set `HORIZON_LAUNCHER_TRASH=<folder>` and
 system's trash goes into that folder, and what Copy would put on the clipboard is written to that
 file, so a test never touches the real trash or clipboard.
 
+Game-cache cleanup resolves aliases above the configured data folder (including macOS's
+`/var` and `/tmp`) before entering the lease protocol. The data folder itself and managed
+descendants may not be symbolic links. Unknown game builds still block shared-cache deletion,
+and a running game's leases prevent deletion until its final owner exits.
+
 ## AI agents (MCP)
 
 `horizon-launcher mcp` is a Model Context Protocol server over stdio. `horizon-launcher

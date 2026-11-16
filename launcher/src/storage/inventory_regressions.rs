@@ -170,13 +170,19 @@ fn capable_units_delete_only_after_the_last_game_lease_and_mixed_builds_stay_res
     use std::process::Command;
     let Some(root) = std::env::var_os("CLASSIFICATION_ROOT") else {
         let root = tempfile::tempdir().unwrap();
+        // Exercise a configured home behind an ancestor alias on every Unix host, not only
+        // macOS's /var and /tmp. Managed descendants must still be walked without links.
+        let real = root.path().join("real");
+        fs::create_dir(&real).unwrap();
+        let alias = root.path().join("alias");
+        std::os::unix::fs::symlink(&real, &alias).unwrap();
         let mut actor = Command::new(std::env::current_exe().unwrap());
         actor.args(["--exact", "storage::inventory::regressions::capable_units_delete_only_after_the_last_game_lease_and_mixed_builds_stay_residual"])
-            .env("CLASSIFICATION_ROOT", root.path()).env("HORIZON_LAUNCHER_HOME", root.path().join("data"))
-            .env("HORIZON_HOME", root.path().join("data/cache"))
-            .env("XDG_DATA_HOME", root.path().join("xdg-data")).env("XDG_CONFIG_HOME", root.path().join("xdg-config"))
-            .env("HORIZON_LAUNCHER_TRASH", root.path().join("trash")).env("HORIZON_LAUNCHER_CLIPBOARD", root.path().join("clipboard"))
-            .env("HORIZON_LAUNCHER_DESKTOP", root.path().join("desktop"))
+            .env("CLASSIFICATION_ROOT", &alias).env("HORIZON_LAUNCHER_HOME", alias.join("data"))
+            .env("HORIZON_HOME", alias.join("data/cache"))
+            .env("XDG_DATA_HOME", alias.join("xdg-data")).env("XDG_CONFIG_HOME", alias.join("xdg-config"))
+            .env("HORIZON_LAUNCHER_TRASH", alias.join("trash")).env("HORIZON_LAUNCHER_CLIPBOARD", alias.join("clipboard"))
+            .env("HORIZON_LAUNCHER_DESKTOP", alias.join("desktop"))
             .env("HORIZON_LAUNCHER_NO_SELF_UPDATE", "1").env("HORIZON_NO_AUDIO", "1");
         assert!(actor.status().unwrap().success());
         return;
@@ -233,6 +239,20 @@ fn capable_units_delete_only_after_the_last_game_lease_and_mixed_builds_stay_res
     assert!(matches!(
         crate::cache_cleanup::delete_game_unit(&cache),
         Err(Error::UnprovenExclusion)
+    ));
+    assert_eq!(fs::read(cache.join("resource")).unwrap(), b"whole resource");
+    let outside = root.join("outside");
+    fs::create_dir_all(outside.join("cache")).unwrap();
+    fs::write(outside.join("cache/world"), b"player data").unwrap();
+    let redirected = root.join("data/redirected");
+    std::os::unix::fs::symlink(&outside, &redirected).unwrap();
+    assert!(crate::cache_cleanup::delete_game_unit(&redirected.join("cache")).is_err());
+    assert_eq!(fs::read(outside.join("cache/world")).unwrap(), b"player data");
+    let linked = root.join("data/linked");
+    std::os::unix::fs::symlink(&cache, &linked).unwrap();
+    assert!(matches!(
+        crate::cache_cleanup::delete_game_unit(&linked),
+        Err(Error::Unsafe(_))
     ));
     assert_eq!(fs::read(cache.join("resource")).unwrap(), b"whole resource");
     fs::remove_dir_all(&old).unwrap();
