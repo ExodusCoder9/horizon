@@ -453,11 +453,13 @@ scripts and tests). Test runs also set `HORIZON_LAUNCHER_TRASH=<folder>` and
 system's trash goes into that folder, and what Copy would put on the clipboard is written to that
 file, so a test never touches the real trash or clipboard.
 
-Game-cache inventory and cleanup resolve aliases above configured roots (including macOS's
-`/var` and `/tmp`) before entering the lease protocol. The data folder itself and managed
-descendants may not be symbolic links. A deleted selected home remains a managed lease
-requirement, so a late game cannot start after cleanup. Unknown game builds still block
-shared-cache deletion, and a running game's leases prevent deletion until its final owner exits.
+Game-cache inventory, cleanup and direct game entry resolve aliases above configured roots
+(including macOS's `/var` and `/tmp`) before entering the lease protocol. Direct entry checks
+the discovered data root before resolving its ancestors and only opens an existing registry.
+The data folder itself and managed descendants may not be symbolic links. A deleted selected
+home remains a managed lease requirement, so a late game cannot start after cleanup. Unknown
+game builds still block shared-cache deletion, and a running game's leases prevent deletion
+until its final owner exits.
 
 ## AI agents (MCP)
 

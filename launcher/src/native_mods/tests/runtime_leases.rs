@@ -99,6 +99,7 @@ fn fresh_native_install_starts_directly_without_a_launcher_launch() {
             "native_mods::runtime_leases_tests::fresh_native_install_starts_directly_without_a_launcher_launch",
         ])
         .env("DIRECT_INSTALLED_GAME", "1")
+        .env("RUST_TEST_NOCAPTURE", "1")
         .current_dir(root.join("home"))
         .status()
         .unwrap();
