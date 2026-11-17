@@ -279,6 +279,16 @@ impl Game<'_> {
         self.swing_arm();
         true
     }
+    /// Passenger capacity of a mount species: 2 for camels, 4 for happy ghasts, 1 for others.
+    pub(super) fn mount_capacity(species: Species) -> usize {
+        if matches!(species, Species::Camel | Species::CamelHusk) {
+            2
+        } else if species == Species::HappyGhast {
+            4
+        } else {
+            1
+        }
+    }
     /// Total passengers (mobs, guests, and host) aboard `vehicle`, excluding the currently acting player.
     pub(super) fn mount_passenger_count(&self, vehicle: u32) -> usize {
         let mob_passengers = self
@@ -294,7 +304,7 @@ impl Game<'_> {
                 .count()
         });
         let host_passenger = if self.lan_acting.is_some() {
-            usize::from(self.lan_outer_ridings.iter().any(|&r| r == Some(vehicle)))
+            usize::from(self.lan_outer_ridings.first().copied().flatten() == Some(vehicle))
         } else {
             0
         };
@@ -305,14 +315,7 @@ impl Game<'_> {
         let held = self.held().cloned();
         let m = &self.mobs[index];
         let species = m.species();
-        let is_camel = matches!(species, Species::Camel | Species::CamelHusk);
-        let max_passengers = if is_camel {
-            2
-        } else if species == Species::HappyGhast {
-            4
-        } else {
-            1
-        };
+        let max_passengers = Self::mount_capacity(species);
         if self.mount_passenger_count(m.id) >= max_passengers {
             return false;
         }
