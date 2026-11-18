@@ -240,6 +240,10 @@ impl Game<'_> {
             return true;
         }
         let id = m.id;
+        let species = m.species();
+        if self.mount_passenger_count(id) >= Self::mount_capacity(species) {
+            return false;
+        }
         if !self.native_may_board(id) {
             return true;
         }
@@ -300,11 +304,14 @@ impl Game<'_> {
             h.hub
                 .guests
                 .iter()
-                .filter(|g| Some(g.conn) != self.lan_acting && g.vehicle == Some(vehicle))
+                .filter(|g| {
+                    Some(g.conn) != self.lan_acting
+                        && self.guest_current_vehicle(g.conn) == Some(vehicle)
+                })
                 .count()
         });
         let host_passenger = if self.lan_acting.is_some() {
-            usize::from(self.lan_outer_ridings.first().copied().flatten() == Some(vehicle))
+            usize::from(self.host_current_vehicle() == Some(vehicle))
         } else {
             0
         };
@@ -315,10 +322,6 @@ impl Game<'_> {
         let held = self.held().cloned();
         let m = &self.mobs[index];
         let species = m.species();
-        let max_passengers = Self::mount_capacity(species);
-        if self.mount_passenger_count(m.id) >= max_passengers {
-            return false;
-        }
         if matches!(species, Species::Pig | Species::Strider) {
             return self.interact_steerable(index, item);
         }
@@ -459,6 +462,9 @@ impl Game<'_> {
         // doPlayerRide: `AbstractHorse.doPlayerRide` turns the rider to the
         // horse's yaw before it seats them.
         let id = self.mobs[index].id;
+        if self.mount_passenger_count(id) >= Self::mount_capacity(species) {
+            return false;
+        }
         if !self.native_may_board(id) {
             return true;
         }

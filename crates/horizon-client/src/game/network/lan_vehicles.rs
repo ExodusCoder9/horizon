@@ -192,6 +192,27 @@ impl Game<'_> {
         })
     }
 
+    /// Returns the live vehicle for guest `conn`, checking suspended outer turns in `lan_outer_ridings`.
+    pub(super) fn guest_current_vehicle(&self, conn: u32) -> Option<u32> {
+        if let Some(pos) = self.lan_guest_swaps.iter().position(|&c| c == conn) {
+            if pos + 1 < self.lan_outer_ridings.len() {
+                return self.lan_outer_ridings[pos + 1];
+            } else if Some(conn) == self.lan_acting {
+                return self.riding;
+            }
+        }
+        self.lan.as_ref()?.hub.guest(conn)?.vehicle
+    }
+
+    /// Returns the live vehicle for the host.
+    pub(super) fn host_current_vehicle(&self) -> Option<u32> {
+        if self.lan_acting.is_some() {
+            self.lan_outer_ridings.first().copied().flatten()
+        } else {
+            self.riding
+        }
+    }
+
     /// Whether a server player other than the one acting rides `vehicle`
     /// (`Entity.canAddPassenger`: a boat or minecart seats one player here).
     pub(super) fn ridden_by_guest(&self, vehicle: u32) -> bool {
@@ -199,10 +220,12 @@ impl Game<'_> {
             h.hub
                 .guests
                 .iter()
-                .any(|g| Some(g.conn) != self.lan_acting && g.vehicle == Some(vehicle))
+                .any(|g| {
+                    Some(g.conn) != self.lan_acting
+                        && self.guest_current_vehicle(g.conn) == Some(vehicle)
+                })
         });
-        let host_rides = self.lan_acting.is_some()
-            && self.lan_outer_ridings.first().copied().flatten() == Some(vehicle);
+        let host_rides = self.lan_acting.is_some() && self.host_current_vehicle() == Some(vehicle);
         other_guest || host_rides
     }
     /// Whether a server player rides `vehicle` (`Entity.isPassenger`: a
@@ -348,16 +371,12 @@ impl Game<'_> {
             return;
         }
         let capacity = self.vehicle_capacity(vehicle);
-        let host_riders = if self.lan_acting.is_some() {
-            usize::from(self.lan_outer_ridings.first().copied().flatten() == Some(vehicle))
-        } else {
-            usize::from(self.riding == Some(vehicle))
-        };
+        let host_riders = usize::from(self.host_current_vehicle() == Some(vehicle));
         let guest_riders = self.lan.as_ref().map_or(0, |host| {
             host.hub
                 .guests
                 .iter()
-                .filter(|g| g.vehicle == Some(vehicle))
+                .filter(|g| self.guest_current_vehicle(g.conn) == Some(vehicle))
                 .count()
         });
         let mob_riders = self

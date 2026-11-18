@@ -1757,17 +1757,16 @@ fn multiple_players_cannot_ride_same_mount() {
             assert!(game.interact_mount(camel_index, "minecraft:air"), "guest can board camel as second rider");
         })
         .unwrap();
-        game.lan
-            .as_mut()
-            .unwrap()
-            .hub
-            .update_guest(13, |guest| guest.vehicle = Some(43))
-            .unwrap();
-        game.guest_boarded(13, None);
         assert_eq!(
             game.lan.as_ref().unwrap().hub.guest(13).unwrap().vehicle,
             Some(43),
             "camel accommodates second rider"
+        );
+        game.guest_boarded(13, None);
+        assert_eq!(
+            game.lan.as_ref().unwrap().hub.guest(13).unwrap().vehicle,
+            Some(43),
+            "guest_boarded confirms second rider"
         );
 
         // Third rider (guest 12) is refused because camel is full (2 riders).
