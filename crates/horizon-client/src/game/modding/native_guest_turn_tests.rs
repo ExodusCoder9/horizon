@@ -1722,9 +1722,11 @@ fn multiple_players_cannot_ride_same_mount() {
         // Host is riding the horse.
         game.riding = Some(42);
 
-        // Guest 13 attempts to interact with the horse while host is riding.
+        // Guest 13 attempts to interact with the horse while host is riding:
+        // boarding and feeding are both refused (AbstractHorse isVehicle).
         game.as_guest(13, |game| {
             assert!(!game.interact_mount(horse_index, "minecraft:air"), "guest cannot board horse host is riding");
+            assert!(!game.interact_mount(horse_index, "minecraft:golden_apple"), "guest cannot feed horse host is riding");
         })
         .unwrap();
 
@@ -1774,6 +1776,24 @@ fn multiple_players_cannot_ride_same_mount() {
             assert!(!game.interact_mount(camel_index, "minecraft:air"), "third rider cannot board camel");
         })
         .unwrap();
+
+        // Nautilus seats 1: host riding refuses guest boarding.
+        let nautilus = game.res.mob_types().get("minecraft:nautilus").unwrap().clone();
+        let mut n = Mob::new(44, nautilus, Vec3::new(3.0, 64.0, 5.0), 0.0);
+        n.extra.tame = true;
+        game.mobs.push(n);
+        let nautilus_index = game.mobs.iter().position(|m| m.id == 44).unwrap();
+        game.riding = Some(44);
+        game.as_guest(13, |game| {
+            assert!(!game.interact_nautilus(nautilus_index, "minecraft:air"), "guest cannot board nautilus host is riding");
+        })
+        .unwrap();
+
+        // Boat capacities: normal boat = 2, chest boat = 1.
+        game.boats.push(crate::game::boats::Boat::new(50, "oak".into(), Vec3::ZERO, 0.0));
+        game.boats.push(crate::game::boats::Boat::new(51, "oak".into(), Vec3::ZERO, 0.0).with_chest());
+        assert_eq!(game.vehicle_capacity(50), 2, "normal boat capacity is 2");
+        assert_eq!(game.vehicle_capacity(51), 1, "chest boat capacity is 1");
     });
 }
 

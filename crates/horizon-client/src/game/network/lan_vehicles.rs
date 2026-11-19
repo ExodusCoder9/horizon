@@ -348,8 +348,8 @@ impl Game<'_> {
 
     /// The maximum passenger capacity of `vehicle`.
     pub(super) fn vehicle_capacity(&self, vehicle: u32) -> usize {
-        if self.boats.iter().any(|b| b.id == vehicle) {
-            2
+        if let Some(b) = self.boats.iter().find(|b| b.id == vehicle) {
+            if b.chest { 1 } else { 2 }
         } else if let Some(m) = self.mobs.iter().find(|m| m.id == vehicle) {
             Self::mount_capacity(m.species())
         } else {
