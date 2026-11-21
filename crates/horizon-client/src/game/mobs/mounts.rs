@@ -322,10 +322,14 @@ impl Game<'_> {
         let held = self.held().cloned();
         let m = &self.mobs[index];
         let species = m.species();
+        let id = m.id;
         if matches!(species, Species::Pig | Species::Strider) {
             return self.interact_steerable(index, item);
         }
         if horizon_client::mobs::llama::is_llama(species) {
+            if self.mount_passenger_count(id) > 0 {
+                return false;
+            }
             return self.interact_llama(index, item);
         }
         if species == Species::HappyGhast {
@@ -340,7 +344,6 @@ impl Game<'_> {
         // AbstractHorse.mobInteract: a horse with a rider (`isVehicle`) has no
         // seat, inventory or feeding to give. Camels seat two and check their
         // passengers themselves.
-        let id = m.id;
         if !matches!(species, Species::Camel | Species::CamelHusk)
             && self.mount_passenger_count(id) > 0
         {

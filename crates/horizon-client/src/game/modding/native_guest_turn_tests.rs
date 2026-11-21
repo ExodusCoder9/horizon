@@ -1789,6 +1789,21 @@ fn multiple_players_cannot_ride_same_mount() {
         })
         .unwrap();
 
+        // Llama seats 1: host riding refuses guest boarding and feeding.
+        let llama = game.res.mob_types().get("minecraft:llama").unwrap().clone();
+        let mut l = Mob::new(45, llama, Vec3::new(3.0, 64.0, 5.0), 0.0);
+        l.extra.tame = true;
+        game.mobs.push(l);
+        let llama_index = game.mobs.iter().position(|m| m.id == 45).unwrap();
+        game.riding = Some(45);
+        game.as_guest(13, |game| {
+            assert!(!game.interact_mount(llama_index, "minecraft:air"), "guest cannot board llama host is riding");
+            assert!(!game.interact_mount(llama_index, "minecraft:wheat"), "guest cannot feed llama host is riding");
+            assert!(!game.interact_llama(llama_index, "minecraft:air"), "guest direct interact_llama cannot board llama host is riding");
+            assert!(!game.interact_llama(llama_index, "minecraft:wheat"), "guest direct interact_llama cannot feed llama host is riding");
+        })
+        .unwrap();
+
         // Boat capacities: normal boat = 2, chest boat = 1.
         game.boats.push(crate::game::boats::Boat::new(50, "oak".into(), Vec3::ZERO, 0.0));
         game.boats.push(crate::game::boats::Boat::new(51, "oak".into(), Vec3::ZERO, 0.0).with_chest());
