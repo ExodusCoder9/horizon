@@ -26,6 +26,7 @@ impl Game<'_> {
             r.set_menu_title(Some(title));
         }
         self.craft_size = 2;
+        self.craft_table = None;
         self.container = None;
         self.station = Some(Station::new_kind(kind, pos));
         self.set_screen(Screen::Inventory);

@@ -388,7 +388,20 @@ impl Game<'_> {
                 v,
             )
         } else {
-            let (kind, map) = if self.container.is_some() {
+            let is_crafting_table = (self.remote_menu_type() == Some("minecraft:crafting")
+                || (self.remote.is_none() && self.craft_table.is_some()))
+                && self.station.is_none()
+                && !self.mount_active()
+                && self.native_screen_height().is_none();
+            let (kind, map) = if is_crafting_table {
+                let map = Map {
+                    container: 0,
+                    table: true,
+                    cells: 9,
+                    plain: true,
+                };
+                (Kind::Crafting, map)
+            } else if self.container.is_some() {
                 let size = self.open_container_size();
                 let (kind, count) = match self.container_kind() {
                     Some(BlockEntity::Chest(_)) => {

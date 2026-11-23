@@ -219,9 +219,8 @@ impl Game<'_> {
         if self.mount_active() || self.native_screen_height().is_some() {
             return None;
         }
-        if self.craft_table.is_some()
-            || self.remote_menu_type() == Some("minecraft:crafting")
-            || self.craft_size == 3
+        if self.remote_menu_type() == Some("minecraft:crafting")
+            || (self.remote.is_none() && self.craft_table.is_some())
         {
             return Some(BookType::Crafting);
         }
@@ -1333,11 +1332,7 @@ impl Game<'_> {
     /// crafting grid.
     pub(super) fn mod_recipe_screen(&self) -> bool {
         self.screen == Screen::Inventory
-            && (self.active_book() == Some(BookType::Crafting)
-                || self.craft_table.is_some()
-                || self.remote_menu_type() == Some("minecraft:crafting")
-                || self.craft_size == 3
-                || self.mod_crafting_open())
+            && (self.active_book() == Some(BookType::Crafting) || self.mod_crafting_open())
             && !self.spectator()
     }
     /// Whether the open menu is a mod menu type with a crafting grid.
@@ -2456,12 +2451,32 @@ mod tests {
             assert_eq!(game.active_book(), Some(BookType::Crafting));
             assert!(game.mod_recipe_screen());
 
-            // A solo/integrated crafting table with local table pos
+            // A solo/integrated crafting table with local table pos resolves to Kind::Crafting
             game.remote = None;
             game.craft_table = Some([10, 64, 10]);
             game.craft_size = 3;
             assert_eq!(game.active_book(), Some(BookType::Crafting));
             assert!(game.mod_recipe_screen());
+            let mut resolved_kind = None;
+            assert!(game.menu_session(|menu, _, _| {
+                resolved_kind = Some(menu.kind());
+                Some(true)
+            }));
+            assert_eq!(resolved_kind, Some(horizon_client::menu::Kind::Crafting));
+
+            // Stations and mounts exclude recipe placement
+            game.station = Some(crate::game::stations::Station::new_kind(
+                crate::game::stations::Kind::Anvil,
+                [10, 64, 10],
+            ));
+            assert_eq!(game.active_book(), None);
+            assert!(!game.mod_recipe_screen());
+            game.station = None;
+
+            game.open_remote_mount_menu(100, 3);
+            assert_eq!(game.active_book(), None);
+            assert!(!game.mod_recipe_screen());
+            game.mount_menu_reset();
 
             // Spectators cannot use recipe screens
             game.mode = horizon_client::command::args::GameMode::Spectator;

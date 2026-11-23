@@ -266,6 +266,7 @@ impl Game<'_> {
         self.craft_grid.fill(None);
         self.carried = None;
         self.craft_size = 2;
+        self.craft_table = None;
         if let Some(key) = self.container.take() {
             // Server containers stay renderable but lose their copied slots.
             if let Some(entity) = self.world.block_entities.get_mut(&key) {
