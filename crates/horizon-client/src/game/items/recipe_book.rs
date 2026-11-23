@@ -219,6 +219,12 @@ impl Game<'_> {
         if self.mount_active() || self.native_screen_height().is_some() {
             return None;
         }
+        if self.craft_table.is_some()
+            || self.remote_menu_type() == Some("minecraft:crafting")
+            || self.craft_size == 3
+        {
+            return Some(BookType::Crafting);
+        }
         match self.container_kind() {
             // The inventory's grid, or a crafting table's (`CraftingScreen`);
             // a server's other menus without a container have no book.
@@ -1327,7 +1333,11 @@ impl Game<'_> {
     /// crafting grid.
     pub(super) fn mod_recipe_screen(&self) -> bool {
         self.screen == Screen::Inventory
-            && (self.active_book() == Some(BookType::Crafting) || self.mod_crafting_open())
+            && (self.active_book() == Some(BookType::Crafting)
+                || self.craft_table.is_some()
+                || self.remote_menu_type() == Some("minecraft:crafting")
+                || self.craft_size == 3
+                || self.mod_crafting_open())
             && !self.spectator()
     }
     /// Whether the open menu is a mod menu type with a crafting grid.
@@ -2424,6 +2434,38 @@ mod tests {
             };
             assert_eq!(open(game, "minecraft:crafting"), Some(BookType::Crafting));
             assert_eq!(open(game, "minecraft:cartography_table"), None);
+        });
+    }
+
+    /// A crafting table recognizes the recipe screen and active book (#18799).
+    #[test]
+    #[ignore = "daily"]
+    fn open_crafting_table_recognizes_recipe_screen_and_active_book() {
+        use super::*;
+        crate::game::native_entity_refs::tests::with_client_game(|game| {
+            let (pipe, _server) = horizon_protocol::connection::Pipe::pair();
+            game.connect_local(pipe, "Crafter").unwrap();
+            game.screen = Screen::Inventory;
+            game.container = Some((10, 64, 10));
+            game.remote
+                .as_mut()
+                .unwrap()
+                .menu
+                .set(Some((1, "minecraft:crafting".into())));
+            game.craft_size = 3;
+            assert_eq!(game.active_book(), Some(BookType::Crafting));
+            assert!(game.mod_recipe_screen());
+
+            // A solo/integrated crafting table with local table pos
+            game.remote = None;
+            game.craft_table = Some([10, 64, 10]);
+            game.craft_size = 3;
+            assert_eq!(game.active_book(), Some(BookType::Crafting));
+            assert!(game.mod_recipe_screen());
+
+            // Spectators cannot use recipe screens
+            game.mode = horizon_client::command::args::GameMode::Spectator;
+            assert!(!game.mod_recipe_screen());
         });
     }
 }
