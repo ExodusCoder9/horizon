@@ -1665,6 +1665,18 @@ impl Title {
             self.set_mode(Mode::Recover { world, issues });
             return Action::None;
         }
+        if world.corrupted {
+            self.set_mode(Mode::Recover {
+                world,
+                issues: [
+                    Some(crate::save::DatIssue::Unreadable(
+                        "Unsupported level data version".into(),
+                    )),
+                    issues[1].clone(),
+                ],
+            });
+            return Action::None;
+        }
         // openWorldCheckVersionCompatibility: a world from another series is an AlertScreen.
         if let Some(version) = crate::save::incompatible_version(&self.saves.join(&world.folder)) {
             let version = if version.is_empty() {
@@ -1753,6 +1765,11 @@ impl Title {
             );
         }
         *self.recent.borrow_mut() = None;
+        let world = if success {
+            read_world(&dir, world.folder.clone()).unwrap_or(world)
+        } else {
+            world
+        };
         self.set_mode(Mode::Recovered { world, success });
     }
     /// `OptimizeWorldScreen.create`: a world that still needs its file fixes or whose level data

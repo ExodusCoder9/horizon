@@ -3310,7 +3310,15 @@ pub enum DatIssue {
 pub fn level_dat_issue(dir: &Path, old: bool) -> Option<DatIssue> {
     let file = if old { "level.dat_old" } else { "level.dat" };
     match try_read_dat(&dir.join(file)) {
-        Ok(root) if matches!(root.get("Data"), Some(Tag::Compound(_))) => None,
+        Ok(root) if matches!(root.get("Data"), Some(Tag::Compound(_))) => {
+            let data = root.get("Data").unwrap();
+            match data.get("version") {
+                Some(Tag::Int(19132 | 19133)) | None => None,
+                _ => Some(DatIssue::Unreadable(
+                    "Unsupported level data version".into(),
+                )),
+            }
+        }
         Ok(_) => Some(DatIssue::Unreadable("Invalid root tag".into())),
         Err(issue) => Some(issue),
     }

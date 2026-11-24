@@ -3175,3 +3175,86 @@ fn standard_anvil_version_19133_is_playable() {
     assert!(world.can_play());
     assert!(world.can_edit());
 }
+
+/// A corrupted world with an unsupported version cannot reach Action::Play; it routes to Mode::Recover.
+#[test]
+fn corrupted_world_with_unsupported_version_opens_recovery_screen_instead_of_play() {
+    let mut f = Fixture::new();
+    crate::save::write_dat(
+        &f.title.saves.join("InvalidVersionWorld").join("level.dat"),
+        Tag::compound([(
+            "Data",
+            Tag::compound([
+                ("LevelName", Tag::String("InvalidVersionWorld".into())),
+                ("version", Tag::Int(99999)),
+                ("GameType", Tag::Int(0)),
+            ]),
+        )]),
+    )
+    .unwrap();
+
+    let worlds = list_worlds(&f.title.saves);
+    let world = worlds
+        .iter()
+        .find(|w| w.folder == "InvalidVersionWorld")
+        .expect("world should be listed")
+        .clone();
+    assert!(world.corrupted);
+
+    // Attempting to play this corrupted entry must enter Mode::Recover, never Action::Play.
+    let action = f.title.play(world);
+    assert_eq!(action, Action::None);
+    assert!(matches!(f.title.mode, Mode::Recover { .. }));
+}
+
+/// Restoring a McRegion level.dat_old refreshes the entry in Mode::Recovered and blocks play.
+#[test]
+fn restoring_mcregion_backup_refreshes_entry_and_blocks_play() {
+    let mut f = Fixture::new();
+    let dir = f.title.saves.join("RecoverMcRegion");
+    fs::create_dir_all(&dir).unwrap();
+    // level.dat is unreadable
+    fs::write(dir.join("level.dat"), b"corrupted").unwrap();
+    // level.dat_old is McRegion (19132)
+    crate::save::write_dat(
+        &dir.join("level.dat_old"),
+        Tag::compound([(
+            "Data",
+            Tag::compound([
+                ("LevelName", Tag::String("OldMcRegion".into())),
+                ("version", Tag::Int(19132)),
+                ("GameType", Tag::Int(0)),
+            ]),
+        )]),
+    )
+    .unwrap();
+
+    let worlds = list_worlds(&f.title.saves);
+    let world = worlds
+        .iter()
+        .find(|w| w.folder == "RecoverMcRegion")
+        .expect("world should be listed")
+        .clone();
+    assert!(world.corrupted);
+    assert!(!world.manual_conversion);
+
+    // Attempt restore
+    f.title.attempt_restore(world);
+    let Mode::Recovered { ref world, success } = f.title.mode else {
+        panic!("expected Recovered mode, got {:?}", f.title.mode);
+    };
+    assert!(success, "restore should succeed");
+    assert!(
+        world.manual_conversion,
+        "refreshed world should have manual_conversion = true"
+    );
+    assert!(!world.corrupted);
+
+    // Continuing with the restored world must block launch because manual_conversion is true
+    let action = f.title.play(world.clone());
+    assert_eq!(
+        action,
+        Action::None,
+        "manual_conversion world must not launch"
+    );
+}
