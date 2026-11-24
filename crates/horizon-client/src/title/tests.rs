@@ -32,6 +32,7 @@ impl Fixture {
                     Tag::compound([
                         ("LevelName", Tag::String(name.into())),
                         ("DataVersion", Tag::Int(horizon_world::DATA_VERSION)),
+                        ("version", Tag::Int(19133)),
                         ("GameType", Tag::Int(1)),
                         ("allowCommands", Tag::Byte(1)),
                         (
@@ -3080,4 +3081,97 @@ mod hidden_features {
             Some(vec!["vanilla".to_owned(), "hidden".to_owned()])
         );
     }
+}
+
+/// A McRegion (pre-1.2, version 19132) save requires manual conversion and
+/// cannot be played or edited (#20939).
+#[test]
+fn mcregion_pre_1_2_save_requires_manual_conversion() {
+    let f = Fixture::new();
+    crate::save::write_dat(
+        &f.title.saves.join("BetaWorld").join("level.dat"),
+        Tag::compound([(
+            "Data",
+            Tag::compound([
+                ("LevelName", Tag::String("BetaWorld".into())),
+                ("version", Tag::Int(19132)),
+                ("GameType", Tag::Int(0)),
+            ]),
+        )]),
+    )
+    .unwrap();
+
+    let worlds = list_worlds(&f.title.saves);
+    let world = worlds
+        .iter()
+        .find(|w| w.folder == "BetaWorld")
+        .expect("BetaWorld should be listed");
+
+    assert!(
+        world.manual_conversion,
+        "version 19132 sets manual_conversion"
+    );
+    assert!(!world.corrupted, "version 19132 is not corrupted");
+    assert!(world.disabled(), "manual_conversion world is disabled");
+    assert!(
+        !world.can_play(),
+        "manual_conversion world cannot be played"
+    );
+    assert!(
+        !world.can_edit(),
+        "manual_conversion world cannot be edited or recreated"
+    );
+
+    let info = world_info(world);
+    assert_eq!(info.plain(), "Must be converted!");
+    assert_eq!(info.spans[0].style.color, Some(0xFF5555));
+}
+
+/// A save with a version other than 19132 or 19133 is corrupted (LevelStorageSource throws NbtFormatException).
+#[test]
+fn world_with_unknown_format_version_is_corrupted() {
+    let f = Fixture::new();
+    crate::save::write_dat(
+        &f.title.saves.join("InvalidVersionWorld").join("level.dat"),
+        Tag::compound([(
+            "Data",
+            Tag::compound([
+                ("LevelName", Tag::String("InvalidVersionWorld".into())),
+                ("version", Tag::Int(99999)),
+                ("GameType", Tag::Int(0)),
+            ]),
+        )]),
+    )
+    .unwrap();
+
+    let worlds = list_worlds(&f.title.saves);
+    let world = worlds
+        .iter()
+        .find(|w| w.folder == "InvalidVersionWorld")
+        .expect("InvalidVersionWorld should be listed");
+
+    assert!(
+        world.corrupted,
+        "unsupported version must mark world corrupted"
+    );
+    assert!(!world.manual_conversion);
+}
+
+/// A standard Anvil save (version 19133) is playable and not marked for conversion.
+#[test]
+fn standard_anvil_version_19133_is_playable() {
+    let f = Fixture::new();
+    f.world("AnvilWorld", "AnvilWorld");
+
+    let worlds = list_worlds(&f.title.saves);
+    let world = worlds
+        .iter()
+        .find(|w| w.folder == "AnvilWorld")
+        .expect("AnvilWorld should be listed");
+
+    assert!(!world.manual_conversion);
+    assert!(!world.corrupted);
+    assert!(!world.disabled());
+    assert!(world.can_play());
+    assert!(world.can_edit());
 }

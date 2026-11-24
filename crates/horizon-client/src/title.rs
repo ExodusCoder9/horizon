@@ -199,6 +199,9 @@ pub struct WorldEntry {
     pub downgrade: bool,
     /// `LevelSummary.isExperimental`: an experimental feature flag is enabled.
     pub experimental: bool,
+    /// `LevelSummary.requiresManualConversion`: McRegion world (version 19132),
+    /// needs conversion in an older Minecraft version before it can be played (#20939).
+    pub manual_conversion: bool,
 }
 impl WorldEntry {
     /// Whether `other` is the same save as this one: its folder, and the level data that names and dates it
@@ -212,6 +215,7 @@ impl WorldEntry {
             && self.hardcore == other.hardcore
             && self.version == other.version
             && self.corrupted == other.corrupted
+            && self.manual_conversion == other.manual_conversion
     }
     /// `LevelSummary.isCompatible`: the saved series is this build's.
     fn compatible(&self) -> bool {
@@ -219,7 +223,7 @@ impl WorldEntry {
     }
     /// `LevelSummary.isDisabled`.
     fn disabled(&self) -> bool {
-        self.locked || !self.compatible()
+        self.locked || !self.compatible() || self.manual_conversion
     }
     /// `LevelSummary.primaryActionActive`: a corrupted world offers recovery.
     fn can_play(&self) -> bool {
@@ -250,6 +254,7 @@ impl WorldEntry {
             file_fixing: false,
             downgrade: false,
             experimental: false,
+            manual_conversion: false,
         }
     }
 }
@@ -643,6 +648,20 @@ fn read_world(path: &Path, folder: String) -> Option<WorldEntry> {
         return Some(WorldEntry::corrupted(folder, modified));
     };
     let data = root.get("Data")?;
+    // LevelStorageSource.makeLevelSummary reads Data.version (LevelVersion.levelDataVersion).
+    // A version other than 19132 (McRegion) or 19133 (Anvil) makes the world corrupted.
+    // Version 19132 sets requiresManualConversion (#20939).
+    let manual_conversion = match data.get("version") {
+        Some(horizon_core::nbt::Tag::Int(19132)) => true,
+        Some(horizon_core::nbt::Tag::Int(19133)) => false,
+        Some(horizon_core::nbt::Tag::Int(_)) => {
+            return Some(WorldEntry::corrupted(folder, modified));
+        }
+        Some(_) => {
+            return Some(WorldEntry::corrupted(folder, modified));
+        }
+        None => false,
+    };
     let modified = match data.get("LastPlayed") {
         // Past the year 9999 it can't be a time an edited or corrupt level.dat meant, and a huge
         // value overflows `SystemTime` on Windows: the file's time stands in, as for a negative one.
@@ -672,6 +691,7 @@ fn read_world(path: &Path, folder: String) -> Option<WorldEntry> {
         file_fixing: crate::save::needs_file_fixes(path),
         downgrade: crate::save::downgraded_from(path).is_some(),
         experimental: experimental_features(data),
+        manual_conversion,
     })
 }
 /// `FeatureFlags.isExperimental` of `LevelStorageSource.parseFeatureFlagsFromSummary`:
@@ -709,6 +729,13 @@ fn world_info(world: &WorldEntry) -> crate::text::Text {
                 "selectWorld.locked",
                 "Locked by another running instance of Minecraft.",
             ),
+            0xFF5555,
+        );
+    }
+    // LevelSummary.createInfo: a world that needs manual conversion says so in red (#20939).
+    if world.manual_conversion {
+        return crate::text::Text::colored(
+            lang::get_or("selectWorld.conversion", "Must be converted!"),
             0xFF5555,
         );
     }
@@ -1606,8 +1633,8 @@ impl Title {
     /// `play`, with `return_to` as the main page an alert returns to (a request's Yes returns to Main, not to
     /// its question).
     fn play_from(&mut self, world: WorldEntry, return_to: Mode) -> Action {
-        // LevelSummary.primaryActionActive: a world another copy has open cannot be joined.
-        if world.locked {
+        // LevelSummary.primaryActionActive: a world another copy has open or that requires manual conversion cannot be joined (#20939).
+        if world.locked || world.manual_conversion {
             return Action::None;
         }
         // `LevelStorageSource.validateAndCreateAccess`: a world folder holding
@@ -2330,6 +2357,10 @@ Would you like to enable the Narrator or visit the Accessibility Settings?",
                 Vec::new()
             } else if world.locked {
                 atlas.font.split(&red("selectWorld.locked"), 175.0)
+            } else if world.manual_conversion {
+                atlas
+                    .font
+                    .split(&red("selectWorld.conversion.tooltip"), 175.0)
             } else if world.incompatible.is_some() {
                 atlas
                     .font
