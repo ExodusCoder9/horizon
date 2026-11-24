@@ -250,18 +250,31 @@ fn an_allay_picks_up_wanted_item_in_reach_without_line_of_sight() {
         .unwrap();
     game.world.set(1, 101, 1, stone).unwrap();
 
-    // Spawn diamond at 0.875, 101.0, 0.875 (inside allay pickup reach).
+    // Spawn diamond at 0.275, 101.0, 0.875 (anchor position is outside reach,
+    // but item AABB intersects reach).
     game.spawn_item(
         ItemStack::new("minecraft:diamond", 1),
-        [0.875, 101.0, 0.875],
+        [0.275, 101.0, 0.875],
         [0.0; 3],
         0,
+    );
+
+    // Verify boundary condition: item position is outside reach, but its bounding box intersects reach.
+    let reach = allay::pickup_reach(game.mobs[i].bounds());
+    let drop = &game.dropped[0];
+    assert!(
+        !reach.contains(drop.position),
+        "item position should be outside reach"
+    );
+    assert!(
+        reach.intersects(drop.bounds()),
+        "item bounding box should intersect reach"
     );
 
     // Line of sight is obstructed.
     let w = game.mob_world();
     let eye = horizon_core::geometry::Vec3::new(1.5, game.mobs[i].eye_y(), 1.5);
-    let at = horizon_core::geometry::Vec3::new(0.875, 101.0 + 0.2125, 0.875);
+    let at = horizon_core::geometry::Vec3::new(0.275, 101.0 + 0.2125, 0.875);
     assert!(
         !w.line_of_sight(eye, at),
         "line of sight should be obstructed"
