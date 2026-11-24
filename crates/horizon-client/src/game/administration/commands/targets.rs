@@ -18,10 +18,8 @@ impl Game<'_> {
     /// Whether `t` is currently in spectator mode (`ServerPlayer.isSpectator`).
     pub(in crate::game) fn target_spectator(&self, t: Target) -> bool {
         match t {
-            Target::Player => match self.lan_acting {
-                Some(conn) => self.command_guest(conn).is_some_and(|g| g.spectator()),
-                None => self.spectator(),
-            },
+            Target::Player => self.spectator(),
+            Target::Guest(conn) if self.lan_acting == Some(conn) => self.spectator(),
             Target::Guest(conn) => self.command_guest(conn).is_some_and(|g| g.spectator()),
             _ => false,
         }

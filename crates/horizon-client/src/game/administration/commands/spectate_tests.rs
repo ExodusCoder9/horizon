@@ -92,5 +92,17 @@ fn spectate_checks_named_player_mode_not_source() {
             !game.run_command("spectate @e[type=minecraft:pig,limit=1] Alex"),
             "spectating with a non-spectator player target fails even if source is spectator"
         );
+
+        // An acting guest in spectator mode is evaluated live in self (#21019).
+        game.lan_acting = Some(1);
+        game.set_mode(GameMode::Spectator);
+        assert!(game.target_spectator(super::super::Target::Guest(1)));
+        assert!(game.target_spectator(super::super::Target::Player));
+
+        // When in survival mode, it evaluates to false.
+        game.set_mode(GameMode::Survival);
+        assert!(!game.target_spectator(super::super::Target::Guest(1)));
+        assert!(!game.target_spectator(super::super::Target::Player));
+        game.lan_acting = None;
     });
 }
