@@ -3860,42 +3860,36 @@ mod tests {
     /// snow golems, wardens, creakings) never draw a held item (#20924).
     #[test]
     fn mobs_without_item_in_hand_layer_never_draw_held_items() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../.local/horizon-client/26.3");
-        if !root.join("entity-models.json").exists() {
-            return;
-        }
-        let types = super::super::MobTypes::load(&root).unwrap();
-        let assets = crate::assets::Assets::load(&root).unwrap();
-        let facts = crate::blocks::BlockFacts::load(&root, assets.registry).unwrap();
-        let data = MobData::load(
-            &horizon_assets::resource_source::ResourceRoot::directory(root.to_path_buf()),
-            &facts,
+        let (mut mob, data) = humanoid_zombie();
+        mob.extra.set_slot_id(
+            horizon_items::equipment::MAINHAND,
+            Some("minecraft:diamond_sword".into()),
         );
-        for id in [
-            "minecraft:enderman",
-            "minecraft:iron_golem",
-            "minecraft:snow_golem",
-            "minecraft:warden",
-            "minecraft:creaking",
+        mob.extra.set_slot_id(
+            horizon_items::equipment::OFFHAND,
+            Some("minecraft:shield".into()),
+        );
+        // Humanoids with ItemInHandLayer draw held items.
+        assert!(held_item_transform(&mob, 1.0, glam::DVec3::ZERO, &data, false).is_some());
+        assert!(held_item_transform(&mob, 1.0, glam::DVec3::ZERO, &data, true).is_some());
+
+        for species in [
+            Species::Enderman,
+            Species::IronGolem,
+            Species::SnowGolem,
+            Species::Warden,
+            Species::Creaking,
         ] {
-            let kind = std::sync::Arc::new(types.types[id].clone());
-            let mut mob = Mob::new(1, kind, horizon_core::geometry::Vec3::ZERO, 0.0);
-            mob.extra.set_slot_id(
-                horizon_items::equipment::MAINHAND,
-                Some("minecraft:diamond_sword".into()),
-            );
-            mob.extra.set_slot_id(
-                horizon_items::equipment::OFFHAND,
-                Some("minecraft:shield".into()),
-            );
+            let mut kind = (*mob.kind).clone();
+            kind.species = species;
+            mob.kind = std::sync::Arc::new(kind);
             assert!(
                 held_item_transform(&mob, 1.0, glam::DVec3::ZERO, &data, false).is_none(),
-                "{id} main hand has no ItemInHandLayer"
+                "{species:?} main hand has no ItemInHandLayer"
             );
             assert!(
                 held_item_transform(&mob, 1.0, glam::DVec3::ZERO, &data, true).is_none(),
-                "{id} off hand has no ItemInHandLayer"
+                "{species:?} off hand has no ItemInHandLayer"
             );
         }
     }
