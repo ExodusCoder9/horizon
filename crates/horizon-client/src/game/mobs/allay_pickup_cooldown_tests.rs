@@ -227,7 +227,7 @@ fn an_allay_picks_up_wanted_item_in_reach_without_line_of_sight() {
     let mut resources = None;
     let mut game = game(&mut resources);
     assert!(game.run_command(
-        "summon allay 61.5 101 1.5 {PersistenceRequired:1b,NoGravity:1b,UUID:[I;24726,0,0,4]}"
+        "summon allay 1.5 101 1.5 {PersistenceRequired:1b,NoGravity:1b,UUID:[I;24726,0,0,4]}"
     ));
     let i = match game.target_with_uuid([24726, 0, 0, 4]) {
         Some(super::commands::Target::Mob(id)) => {
@@ -241,27 +241,34 @@ fn an_allay_picks_up_wanted_item_in_reach_without_line_of_sight() {
     let id = game.mobs[i].id;
     game.creatures.ticked.insert(id);
 
-    // Place stone at 61, 101, 1 to obstruct line of sight.
-    let stone = game.pack.assets.registry.default_state("minecraft:stone").unwrap();
-    game.world.set(61, 101, 1, stone).unwrap();
+    // Place stone at 1, 101, 1 to obstruct line of sight.
+    let stone = game
+        .pack
+        .assets
+        .registry
+        .default_state("minecraft:stone")
+        .unwrap();
+    game.world.set(1, 101, 1, stone).unwrap();
 
-    // Spawn diamond at 60.875, 101.0, 0.875 (inside allay pickup reach).
+    // Spawn diamond at 0.875, 101.0, 0.875 (inside allay pickup reach).
     game.spawn_item(
         ItemStack::new("minecraft:diamond", 1),
-        [60.875, 101.0, 0.875],
+        [0.875, 101.0, 0.875],
         [0.0; 3],
         0,
     );
 
     // Line of sight is obstructed.
     let w = game.mob_world();
-    let eye = horizon_core::geometry::Vec3::new(61.5, game.mobs[i].eye_y(), 1.5);
-    let at = horizon_core::geometry::Vec3::new(60.875, 101.0 + 0.2125, 0.875);
-    assert!(!w.line_of_sight(eye, at), "line of sight should be obstructed");
+    let eye = horizon_core::geometry::Vec3::new(1.5, game.mobs[i].eye_y(), 1.5);
+    let at = horizon_core::geometry::Vec3::new(0.875, 101.0 + 0.2125, 0.875);
+    assert!(
+        !w.line_of_sight(eye, at),
+        "line of sight should be obstructed"
+    );
 
     // The allay picks up the item because it is in reach (#20557).
     game.tick_allays();
     assert_eq!(allay::inventory(&game.mobs[i]).map(|s| s.count), Some(1));
     assert!(game.dropped.is_empty());
 }
-

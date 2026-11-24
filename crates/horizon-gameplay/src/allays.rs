@@ -56,7 +56,7 @@ pub fn tick_allays<L: AllayLevel + ?Sized>(l: &mut L) {
                 .iter()
                 .enumerate()
                 .filter(|(_, e)| {
-                    reach.contains(e.position)
+                    reach.intersects(e.bounds())
                         && e.pickup_delay == 0
                         && allay::considers_item_equal(&held, &e.stack)
                         && room(&e.stack) > 0
@@ -114,7 +114,7 @@ pub fn tick_allays<L: AllayLevel + ?Sized>(l: &mut L) {
         };
         let p = l.parts();
         let e = &p.dropped[j];
-        if reach.contains(e.position) {
+        if reach.intersects(e.bounds()) {
             let (item, id) = (e.clone(), p.mobs[i].id);
             let max = p.mobs[i].kind.inventory_stack_limit(&e.stack);
             let take = p.mobs[i]
